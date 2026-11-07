@@ -96,9 +96,15 @@ section{padding-block:56px;border-top:1px solid var(--rule)}
 .tag{font-family:var(--mono);font-size:11.5px;padding:3px 8px;border-radius:4px;background:var(--accent-soft);color:var(--accent)}
 .tag.ok{background:var(--ok-soft);color:var(--ok)}
 .tag.plain{background:transparent;border:1px solid var(--rule);color:var(--muted)}
-.tag a{color:inherit}
-.tag.pdf{background:var(--ink);color:var(--bg)}
-.tag.pdf a{text-decoration:none}
+.tag a{color:inherit;text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+.tag:has(a){padding:0;border:1px solid var(--accent);background:var(--surface)}
+.tag:has(a) a{display:inline-block;padding:3px 8px;color:var(--accent)}
+.tag:has(a):hover{background:var(--accent)}
+.tag:has(a):hover a{color:var(--bg)}
+.tag:has(a) a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+.tag.pdf,.tag.pdf:has(a){background:var(--accent);border-color:var(--accent)}
+.tag.pdf a,.tag.pdf:has(a) a{color:var(--bg);text-decoration:none;font-weight:500}
+.tag.pdf:has(a):hover{background:var(--ink);border-color:var(--ink)}
 .panel-pics{grid-column:1 / -1;display:flex;gap:12px}
 .panel-pics figure{margin:0;flex:1 1 0;min-width:0}
 .panel-pics img{width:100%;border-radius:5px}
