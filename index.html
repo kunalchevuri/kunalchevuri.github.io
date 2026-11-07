@@ -180,7 +180,14 @@ footer{padding-block:28px 48px;border-top:1px solid var(--rule);color:var(--mute
 .viewer-bar button{font-family:var(--mono);font-size:13px;padding:7px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.4);background:transparent;color:#fff;cursor:pointer}
 .viewer-bar button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .viewer-pages{flex:1;overflow:auto;display:flex;flex-direction:column;align-items:center;gap:14px;padding-bottom:24px}
-.viewer-pages canvas{width:100%;max-width:860px;height:auto;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.4)}
+.viewer-page{position:relative;width:100%;max-width:860px;box-shadow:0 2px 12px rgba(0,0,0,.4);background:#fff}
+.viewer-page canvas{display:block;width:100%;height:auto}
+.viewer-page a.pdf-link{position:absolute;display:block;border-radius:2px}
+.viewer-page a.pdf-link:hover{background:rgba(35,64,143,.15);outline:1px solid rgba(35,64,143,.5)}
+.viewer-page a.pdf-link:focus-visible{outline:2px solid #2340a0}
+.viewer-bar .vb-actions{display:flex;gap:8px;flex-shrink:0}
+.viewer-bar a.vb-open{font-family:var(--mono);font-size:13px;padding:7px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.4);color:#fff;text-decoration:none}
+.viewer-bar a.vb-open:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .viewer-msg{color:#fff;font-family:var(--mono);font-size:13px;padding:24px}
 </style>
 
@@ -484,7 +491,7 @@ footer{padding-block:28px 48px;border-top:1px solid var(--rule);color:var(--mute
 })();
 </script>
 <div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-label="Paper viewer">
-  <div class="viewer-bar"><span id="viewer-title">Paper</span><button type="button" id="viewer-close">Close</button></div>
+  <div class="viewer-bar"><span id="viewer-title">Paper</span><span class="vb-actions"><a class="vb-open" id="viewer-open" href="#" target="_blank" rel="noopener" data-raw="1">Open PDF ↗</a><button type="button" id="viewer-close">Close</button></span></div>
   <div class="viewer-pages" id="viewer-pages"></div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -497,11 +504,11 @@ footer{padding-block:28px 48px;border-top:1px solid var(--rule);color:var(--mute
   document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!v.hidden)close();});
   function msg(s){pages.innerHTML='';var p=document.createElement('p');p.className='viewer-msg';p.textContent=s;pages.appendChild(p);}
   document.addEventListener('click',function(e){
-    var a=e.target.closest&&e.target.closest('a[href$=".pdf"]');
+    var a=e.target.closest&&e.target.closest('a[href$=".pdf"]:not([data-raw])');
     if(!a||!window.pdfjsLib)return;
     e.preventDefault();lastFocus=a;var my=++token;
     var h=a.closest('.pub');title.textContent=a.dataset.title||(h?h.querySelector('h3').textContent:'Paper');
-    v.hidden=false;document.body.style.overflow='hidden';msg('Loading paper…');document.getElementById('viewer-close').focus();
+    document.getElementById('viewer-open').setAttribute('href',a.getAttribute('href'));v.hidden=false;document.body.style.overflow='hidden';msg('Loading paper…');document.getElementById('viewer-close').focus();
     fetch(a.getAttribute('href')).then(function(r){if(!r.ok)throw new Error();return r.arrayBuffer();})
     .then(function(buf){return pdfjsLib.getDocument({data:buf,isEvalSupported:false}).promise;})
     .then(function(pdf){
@@ -511,9 +518,20 @@ footer{padding-block:28px 48px;border-top:1px solid var(--rule);color:var(--mute
       for(var i=1;i<=pdf.numPages;i++)(function(n){chain=chain.then(function(){
         if(my!==token)return;
         return pdf.getPage(n).then(function(pg){
-          var vp=pg.getViewport({scale:scale}),c=document.createElement('canvas');
-          c.width=vp.width;c.height=vp.height;c.setAttribute('aria-label','Page '+n);pages.appendChild(c);
-          return pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;});
+          var vp=pg.getViewport({scale:scale}),wrap=document.createElement('div'),c=document.createElement('canvas');
+          wrap.className='viewer-page';c.width=vp.width;c.height=vp.height;c.setAttribute('aria-label','Page '+n);
+          wrap.appendChild(c);pages.appendChild(wrap);
+          var draw=pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+          var links=pg.getAnnotations().then(function(anns){
+            anns.forEach(function(an){
+              if(an.subtype!=='Link'||!an.url)return;
+              var r=vp.convertToViewportRectangle(an.rect),x=Math.min(r[0],r[2]),y=Math.min(r[1],r[3]),w=Math.abs(r[2]-r[0]),h=Math.abs(r[3]-r[1]);
+              var l=document.createElement('a');l.className='pdf-link';l.href=an.url;l.target='_blank';l.rel='noopener';l.dataset.raw='1';l.title=an.url;l.setAttribute('aria-label','Link: '+an.url);
+              l.style.left=(x/vp.width*100)+'%';l.style.top=(y/vp.height*100)+'%';l.style.width=(w/vp.width*100)+'%';l.style.height=(h/vp.height*100)+'%';
+              wrap.appendChild(l);
+            });
+          }).catch(function(){});
+          return Promise.all([draw,links]);});
       });})(i);
       return chain;
     }).catch(function(){if(my===token)msg('This paper could not be loaded. Try again in a moment.');});
